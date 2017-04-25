@@ -417,7 +417,7 @@ NewThreadURL = Protocol+ThreadURL
 
 print("Downloading", NewThreadURL)
 lRawData = execute_http_request(NewThreadURL)
-print("Downloading complete, data size =", len(lRawData))
+print("Download complete, data size =", len(lRawData))
 
 lProcessedData = lRawData.decode("utf-8")
 print("Parsing page...")
