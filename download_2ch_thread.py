@@ -15,6 +15,7 @@ ctaBold = "B"
 ctaCursive = "C"
 ctaHidden = "H"
 ctaStrike = "S"
+ctaReplacedColored = "R"
 
 
 def PrintException():
@@ -142,6 +143,19 @@ def IsHiddenText(Node):
 def ParseStrikeText(Node, Attributes, Post):
     A = Attributes[:] + [ctaStrike]
     ParsePostTextRec(Node, A, Post)
+
+
+def IsReplacedColoredText(Node):
+    if Node.fNodeType == "span":
+        s = Node.GetAttribute("style")
+        if s.startswith("color:"):
+            return True
+    return False
+
+
+def ParseReplacedColoredText(Node, Attributes, Post):
+    A = Attributes[:] + [ctaReplacedColored]
+    ParsePostTextRec(Node, A, Post)
     
     
     
@@ -187,6 +201,9 @@ def ParsePostTextRec(PostTextNode, Attributes, Post):
             
         elif IsBold(E):            
             ParseBold(E, Attributes, Post)
+
+        elif IsReplacedColoredText(E):
+            ParseReplacedColoredText(E, Attributes, Post)
             
 
             
@@ -244,14 +261,17 @@ def SplitStringByFirstSymbol(S, Sym):
 
                         
 def DateTimeToStandardFormat(T):
-    a0t, a0m = SplitStringByFirstSymbol(T, "&")
-    a1 = a0t.split(" ")
-    dp, dnp, tp = a1[0], a1[1], a1[2]
-    d_arr = dp.split("/")
-    t_arr = tp.split(":")
-    lDay, lMonth, lYear = d_arr[0], d_arr[1], "20"+d_arr[2]
-    lHour, lMinute, lSecond = t_arr[0], t_arr[1], t_arr[2]
-    return lYear+"."+lMonth+"."+lDay+" "+lHour+":"+lMinute+":"+lSecond
+    try:
+        a0t, a0m = SplitStringByFirstSymbol(T, "&")
+        a1 = a0t.split(" ")
+        dp, dnp, tp = a1[0], a1[1], a1[2]
+        d_arr = dp.split("/")
+        t_arr = tp.split(":")
+        lDay, lMonth, lYear = d_arr[0], d_arr[1], "20"+d_arr[2]
+        lHour, lMinute, lSecond = t_arr[0], t_arr[1], t_arr[2]
+        return lYear+"."+lMonth+"."+lDay+" "+lHour+":"+lMinute+":"+lSecond
+    except:
+        print ("DateTime conversion exception")
 
 
 class TIB2chParser(TAbstractParser):
@@ -294,8 +314,14 @@ class TIB2chParser(TAbstractParser):
         
         lID = PostNode2.GetAttribute("data-num")
         BQ = PostNode2.FindFirstInChildren("blockquote", "class", "post-message", True, True)
+
+        # Get post datetime
+        lPostDateTime = "0000.00.00 00:00:00"
         TS = PostNode.FindFirstInChildren("span", "class", "posttime", True, True)
-        TST = TS.FindFirstInChildren("wild", "", "", False, True)
+        if TS is not None:
+            TST = TS.FindFirstInChildren("wild", "", "", False, True)
+            lPostDateTime = DateTimeToStandardFormat(TST.fText)
+
         PIN1 = PostNode.FindFirstInChildren("span", "class", "ananimas", True, False)
         if PIN1 is not None:
             PIN2 = PIN1.FindFirstInChildren("span", "", "", False, False)
@@ -312,7 +338,7 @@ class TIB2chParser(TAbstractParser):
         
         Post.fNumber = lID
         Post.fPosterID = PosterID
-        Post.fDate = DateTimeToStandardFormat(TST.fText)
+        Post.fDate = lPostDateTime
 
         
         ParsePostTextRec(BQ, [], Post)

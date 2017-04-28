@@ -190,7 +190,6 @@ def OnDoneReadingTagFinish(R, StateContainer, NodeContainer, Accumulators, AttrB
 
     return lRes
 
-
 def IsEmptyWildText(T):
     lRes = True
     for C in T:
@@ -200,6 +199,37 @@ def IsEmptyWildText(T):
     return lRes
 
 
+def SmartStripText(T):
+    if len(T) == 0:
+        return ""
+
+    lFNSS = -1
+    lLNSS = -1
+    
+    
+    for i in range(len(T)):
+        if T[i] in [" ", chr(9), "\n"]:
+            pass
+        else:
+            if lFNSS == -1:
+                lFNSS = i
+            lLNSS = i
+
+    if lFNSS >= 0:
+        S = T[lFNSS:lLNSS+1]
+
+        if lFNSS > 0:
+            S = " " + S
+
+        if lLNSS + 1 != len(T):
+            S += " "
+
+        return S
+    else:
+        return " "
+
+
+
 def OnDoneReadingWildText(R, StateContainer, NodeContainer, Accumulators, SMVars, AttrBuffer, ErrorHandlers, DebugLines):
     if IsEmptyWildText(Accumulators[3]):
         pass
@@ -207,9 +237,9 @@ def OnDoneReadingWildText(R, StateContainer, NodeContainer, Accumulators, SMVars
         N = THTMLNode(NodeContainer.fDocument)
         N.fParentNode = NodeContainer.fNode
         N.fNodeType = "wild"
-        N.fText = Accumulators[3]
-        if "TrimText" in SMVars:
-            N.fText = N.fText.strip(" \n"+chr(9))
+        N.fText = SmartStripText(Accumulators[3])
+        #if "TrimText" in SMVars:
+        #    N.fText = N.fText.strip(" \n"+chr(9))
         N.fDepth = NodeContainer.fNode.fDepth + 1
         NodeContainer.fNode.AddChildNode(N)
     return 0
@@ -422,7 +452,11 @@ def Parse(Data, Document, Parameters, ErrorHandlers):
     lNodeContainer.fDocument = Document
     lNodeContainer.fNode = Document.fRootNode
 
-    R = TBinaryReader(Data)
+    lUseDebugBuffer = False
+    if "UseDebugBuffer" in Parameters:
+        lUseDebugBuffer = True
+
+    R = TBinaryReader(Data, lUseDebugBuffer)
     R.Read()
 
     if R.fLast in cTAGSTART:
