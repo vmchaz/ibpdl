@@ -456,7 +456,7 @@ bp.Parse(Doc)
 
 print("Parsing complete")
 
-ThreadText = "@global source=\""+NewThreadURL+"\" title=\"\"\n"
+ThreadText = "@global source=\""+NewThreadURL+"\" title=\""+gTitle+"\"\n"
 gImages = {}
 
 for P in bp.fPosts:
