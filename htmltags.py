@@ -81,6 +81,7 @@ cTags = {
     "nav":{"Pairing":cprStrict},
     "nobr":{"Pairing":cprStrict},
     "noframes":{"Pairing":cprStrict},
+    "noindex":{"Pairing":cprStrict},
     "noscript":{"Pairing":cprStrict},
     "object":{"Pairing":cprStrict},
     "ol":{"Pairing":cprStrict},
