@@ -17,6 +17,8 @@ ctaHidden = "H"
 ctaStrike = "S"
 ctaReplacedColored = "R"
 
+gRetryCount = 3
+
 
 def PrintException():
     pass
@@ -374,26 +376,26 @@ def DownloadImages(Post, Images, DownloadImages, DownloadVideos):
         if Type in cIMAGE_TYPES:
             if DownloadImages in cDOWNLOAD_IMAGES_PREVIEW:
                 print("Downloading", preview_src)
-                d = execute_http_request(preview_src)
+                d = execute_http_request(preview_src, gRetryCount)
                 print("Downloading complete, data size =", len(d))
                 Images[Preview] = d
                 
             if DownloadImages in cDOWNLOAD_IMAGES_FULL:
                 print("Downloading", full_src)
-                d = execute_http_request(full_src)
+                d = execute_http_request(full_src, gRetryCount)
                 print("Downloading complete, data size =", len(d))
                 Images[FileName] = d
                 
         if Type in cVIDEO_TYPES:
             if DownloadVideos in cDOWNLOAD_VIDEOS_PREVIEW:
                 print("Downloading", preview_src)
-                d = execute_http_request(preview_src)
+                d = execute_http_request(preview_src, gRetryCount)
                 print("Downloading complete, data size =", len(d))
                 Images[Preview] = d
                 
             if DownloadVideos in cDOWNLOAD_VIDEOS_FULL:
                 print("Downloading", full_src)
-                d = execute_http_request(full_src)
+                d = execute_http_request(full_src, gRetryCount)
                 print("Downloading complete, data size =", len(d))                
                 Images[FileName] = d
 
@@ -442,7 +444,7 @@ Protocol = "https://"
 NewThreadURL = Protocol+ThreadURL
 
 print("Downloading", NewThreadURL)
-lRawData = execute_http_request(NewThreadURL)
+lRawData = execute_http_request(NewThreadURL, gRetryCount)
 print("Download complete, data size =", len(lRawData))
 
 lProcessedData = lRawData.decode("utf-8")

@@ -13,18 +13,24 @@ import urllib.request
     except:
         return "" """
         
-def execute_http_request(URL, encoding = ""):
+def execute_http_request(URL, RetryCount=1, encoding = ""):
     #try:
-    hdr = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:44.0) Gecko/20100101 Firefox/44.0'}
-    req = urllib.request.Request(URL, data=None, headers=hdr)
+    for i in range(RetryCount):
+        try:
+            hdr = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:44.0) Gecko/20100101 Firefox/44.0'}
+            req = urllib.request.Request(URL, data=None, headers=hdr)
 
-    f = urllib.request.urlopen(req)
-    raw_data = f.read()
-    if encoding == "":
-        return raw_data
-    else:
-        decoded_data = raw_data.decode(encoding)
-        return decoded_data
+            f = urllib.request.urlopen(req)
+            raw_data = f.read()
+            if encoding == "":
+                return raw_data
+            else:
+                decoded_data = raw_data.decode(encoding)
+                return decoded_data
+        except:
+            raise
+    raise "Error downloading "+URL
+    
     
     
 def download_file(URL):
