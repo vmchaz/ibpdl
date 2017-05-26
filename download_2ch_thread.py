@@ -8,6 +8,8 @@ from io import BytesIO
 from htmldocument import THTMLNode, THTMLDocument
 from abstractparser import TPost, TAbstractParser
 from httpclient import execute_http_request
+from os import listdir
+import os.path
 
 ctaWild = "W"
 ctaQuote = "Q"
@@ -18,31 +20,58 @@ ctaStrike = "S"
 ctaReplacedColored = "R"
 
 gRetryCount = 3
+gCacheDir = ""
 
+class TCache:
+    def __init__(self):
+        self.fDirectory = ""
+        self.fFiles = {}
+        self.fEnabled = False
+        #Сканирование каталога кэша
 
-def PrintException():
-    pass
-    #print(sys.exc_info())
-    #print(dir(e))    
+    def SetDirectory(self, Directory):
+        self.fDirectory = Directory
 
+    def EnableCache(self):
+        self.fEnabled = True
 
-def ExceptionToString():
-    exc_type, exc_obj, tb = sys.exc_info()
-    s1 = str(exc_type) + str(exc_obj) + str(tb)
-    print
-    lineno = tb.tb_lineno
-    filename = f.f_code.co_filename
-    return s1 + filename + str(lineno)
-    linecache.checkcache(filename)
-    line = linecache.getline(filename, lineno, f.f_globals)
-    return 'EXCEPTION IN ({}, LINE {} "{}"): {}'.format(filename, lineno, line.strip(), exc_obj)
+    def ScanDirectory(self):
+        if not self.fEnabled:
+            return
+
+        for fn in listdir(self.fDirectory):
+            full_fn = os.path.join(self.fDirectory, fn)
+            if os.path.isfile(full_fn):
+                f = open(full_fn, "rb")
+                data = f.read()
+                self.fFiles[fn] = data
+
+    def CheckFile(self, FileName):
+        if self.fEnabled:
+            return FileName in self.fFiles
+        else:
+            return False
+
+    def GetFile(self, FileName):
+        if self.fEnabled:
+            return self.fFiles[FileName]
+
+    def AddFile(self, FileName, Data):
+        if not self.fEnabled:
+            return
+
+        if not self.CheckFile(FileName):
+            full_fn = os.path.join(self.fDirectory, FileName)
+            f = open(full_fn, "wb")
+            f.write(Data)
+            f.close()
 
 
 
 
 gSiteAddress = "2ch.hk"
 gTitle = ""
-
+gCache = TCache()
 
   
 
@@ -367,42 +396,53 @@ cDOWNLOAD_VIDEOS_PREVIEW = ["preview", "all"]
 cDOWNLOAD_VIDEOS_FULL = ["full", "all"]
 
 
-def DownloadImages(Post, Images, DownloadImages, DownloadVideos):
+def ProcessFileURL(FileName, FileSource, Cache, Images, RetryCount):
+    print("Downloading", FileSource)
+    if Cache.CheckFile(FileName):
+        print("File", FileName, "found in cache")
+        Images[FileName] = Cache.GetFile(FileName)
+    else:
+        try:
+            d = execute_http_request(FileSource, RetryCount)
+            print("Downloading complete, data size =", len(d))
+            Cache.AddFile(FileName, d)
+            Images[FileName] = d
+
+        except:
+            if IgnoreErrors:
+                print("Error downloading", FileSource)
+            else:
+                raise
+
+
+def DownloadImages(Post, Images, Cache, DownloadImages, DownloadVideos, IgnoreErrors, RetryCount):
     for I in Post.fImages:
-        UID, Type, FileName, Source, Preview, PreviewSource = I[0], I[1], I[2], I[3], I[4], I[5]
+        UID, Type, FileName, Source, PreviewFileName, PreviewSource = I[0], I[1], I[2], I[3], I[4], I[5]
         full_src = Protocol + SiteName + Source
-        preview_src = Protocol + SiteName + PreviewSource
+        full_preview_src = Protocol + SiteName + PreviewSource
         
+
         if Type in cIMAGE_TYPES:
             if DownloadImages in cDOWNLOAD_IMAGES_PREVIEW:
-                print("Downloading", preview_src)
-                d = execute_http_request(preview_src, gRetryCount)
-                print("Downloading complete, data size =", len(d))
-                Images[Preview] = d
-                
+                ProcessFileURL(PreviewFileName, full_preview_src, Cache, Images, RetryCount)
+
             if DownloadImages in cDOWNLOAD_IMAGES_FULL:
-                print("Downloading", full_src)
-                d = execute_http_request(full_src, gRetryCount)
-                print("Downloading complete, data size =", len(d))
-                Images[FileName] = d
+                ProcessFileURL(FileName, full_src, Cache, Images, RetryCount)
                 
         if Type in cVIDEO_TYPES:
             if DownloadVideos in cDOWNLOAD_VIDEOS_PREVIEW:
-                print("Downloading", preview_src)
-                d = execute_http_request(preview_src, gRetryCount)
-                print("Downloading complete, data size =", len(d))
-                Images[Preview] = d
+                ProcessFileURL(PreviewFileName, full_preview_src, Cache, Images, RetryCount)
                 
             if DownloadVideos in cDOWNLOAD_VIDEOS_FULL:
-                print("Downloading", full_src)
-                d = execute_http_request(full_src, gRetryCount)
-                print("Downloading complete, data size =", len(d))                
-                Images[FileName] = d
+                ProcessFileURL(FileName, full_src, Cache, Images, RetryCount)
+
+        return 0
 
         
 SaveImages = "all"
 SaveVideos = "all"
 SaveFormat = "tar"
+IgnoreErrors = False
 
 if len(sys.argv) < 2:
     print("not enough args!")
@@ -419,6 +459,15 @@ for a in arg_p:
         
     if a.startswith("--videos="):
         SaveVideos = a[len("--videos="):]
+
+    if a.startswith("--ignore-errors"):
+        IgnoreErrors = True
+
+    if a.startswith("--cache="):
+        gCacheDir = a[len("--cache="):]
+        gCache.SetDirectory(gCacheDir)
+        gCache.EnableCache()
+
         
     if a.startswith("--format="):
         SaveFormat = a[len("--format="):]
@@ -464,8 +513,11 @@ gImages = {}
 for P in bp.fPosts:
     ThreadText += P.Print()
 
+if gCache.fEnabled:
+    gCache.ScanDirectory()
+
 for P in bp.fPosts:
-    DownloadImages(P, gImages, SaveImages, SaveVideos)
+    DownloadImages(P, gImages, gCache, SaveImages, SaveVideos, IgnoreErrors, gRetryCount)
     
 tarfn = ""
 for c in NewThreadURL:

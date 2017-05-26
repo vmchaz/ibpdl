@@ -10,7 +10,7 @@ if len(sys.argv) <= 2:
     
     
 print("Saving URL ", sys.argv[1], "to file", sys.argv[2])
-lRawData = execute_http_request(sys.argv[1], "utf-8")
+lRawData = execute_http_request(sys.argv[1], RetryCount=3, encoding="utf-8")
     
 f = open(sys.argv[2], "w", encoding="utf8")
 f.write(lRawData)
