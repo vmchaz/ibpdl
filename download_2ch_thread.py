@@ -436,7 +436,7 @@ def DownloadImages(Post, Images, Cache, DownloadImages, DownloadVideos, IgnoreEr
             if DownloadVideos in cDOWNLOAD_VIDEOS_FULL:
                 ProcessFileURL(FileName, full_src, Cache, Images, RetryCount)
 
-        return 0
+    return 0
 
         
 SaveImages = "all"
