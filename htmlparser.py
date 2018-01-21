@@ -1,3 +1,4 @@
+# coding:utf-8
 import sys
 import copy
 import binaryreader
@@ -6,6 +7,8 @@ import statemachine
 from statemachine import cStates
 from htmldocument import THTMLNode
 import htmltags
+
+
 
 ctCOMMENT_OPEN = "<!--"
 ctCOMMENT_CLOSE = "-->"

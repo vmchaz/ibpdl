@@ -9,6 +9,8 @@ from htmldocument import THTMLNode, THTMLDocument
 from abstractparser import TPost, TAbstractParser
 from httpclient import execute_http_request
 from os import listdir
+import copy
+import os
 import os.path
 
 ctaWild = "W"
@@ -27,7 +29,7 @@ class TCache:
         self.fDirectory = ""
         self.fFiles = {}
         self.fEnabled = False
-        #Сканирование каталога кэша
+        #Scanning cache dir
 
     def SetDirectory(self, Directory):
         self.fDirectory = Directory
@@ -304,13 +306,27 @@ def DateTimeToStandardFormat(T):
     except:
         print ("DateTime conversion exception")
 
+def DoesAddressMatch(address):
+    if address.startswith("https://"):
+        address = address[8:]
+    elif address.startswith("http://"):
+        address = address[7:]
+
+    addr2 = address.lower()
+    if addr2.startswith("2ch.hk"):
+        return True
+
+    return False
+
 
 class TIB2chParser(TAbstractParser):
+
     def Parse(self, HTMLDocument):
         global gTitle
         #try:
         
-        T1Node = Doc.fRootNode.FindFirstInChildren("html", "", "", False, False)
+        T1Node = HTMLDocument.fRootNode.FindFirstInChildren("html", "", "", False, False)
+        #T1Node = Doc.fRootNode.FindFirstInChildren("html", "", "", False, False)
         if T1Node is not None:
             T2Node = T1Node.FindFirstInChildren("head", "", "", False, False)
             if T2Node is not None:
@@ -319,8 +335,9 @@ class TIB2chParser(TAbstractParser):
                     T4Node = T3Node.FindFirstInChildren("wild", "", "", False, False)
                     if T4Node is not None:
                         gTitle = T4Node.fText
-                
-        ThreadNode = Doc.fRootNode.FindFirstInChildren("div", "class", "thread", True, True)
+        
+        #ThreadNode = Doc.fRootNode.FindFirstInChildren("div", "class", "thread", True, True)
+        ThreadNode = HTMLDocument.fRootNode.FindFirstInChildren("div", "class", "thread", True, True)
         PNL = []
         ThreadNode.FindInChildren("div", "class", "oppost-wrapper", False, PNL)
         ThreadNode.FindInChildren("div", "class", "post-wrapper", False, PNL)
@@ -415,7 +432,7 @@ def ProcessFileURL(FileName, FileSource, Cache, Images, RetryCount):
                 raise
 
 
-def DownloadImages(Post, Images, Cache, DownloadImages, DownloadVideos, IgnoreErrors, RetryCount):
+def DownloadImages(Post, Images, Cache, DownloadImages, DownloadVideos, Protocol, SiteName, IgnoreErrors, RetryCount):
     for I in Post.fImages:
         UID, Type, FileName, Source, PreviewFileName, PreviewSource = I[0], I[1], I[2], I[3], I[4], I[5]
         full_src = Protocol + SiteName + Source
@@ -439,131 +456,136 @@ def DownloadImages(Post, Images, Cache, DownloadImages, DownloadVideos, IgnoreEr
     return 0
 
         
-SaveImages = "all"
-SaveVideos = "all"
-SaveFormat = "tar"
-IgnoreErrors = False
+def DownloadThread(address, args, config):
+    SaveImages = "all"
+    SaveVideos = "all"
+    SaveFormat = "tar"
+    IgnoreErrors = False
 
-if len(sys.argv) < 2:
-    print("not enough args!")
-    sys.exit(0)
-    
-arg_p = []
-if len(sys.argv) >= 3:
-    arg_p = sys.argv[2:]
-    
-    
-for a in arg_p:
-    if a.startswith("--images="):
-        SaveImages = a[len("--images="):]
-        
-    if a.startswith("--videos="):
-        SaveVideos = a[len("--videos="):]
+    arg_p = copy.copy(args)
 
-    if a.startswith("--ignore-errors"):
-        IgnoreErrors = True
 
-    if a.startswith("--cache="):
-        gCacheDir = a[len("--cache="):]
-        gCache.SetDirectory(gCacheDir)
-        gCache.EnableCache()
+    for a in arg_p:
+        if a.startswith("--images="):
+            SaveImages = a[len("--images="):]
 
-        
-    if a.startswith("--format="):
-        SaveFormat = a[len("--format="):]
-        if SaveFormat == "tar":
-            pass
-        if SaveFormat == "txt":
-            SaveImages = "None"
-            SaveVideos = "None"
-        
+        if a.startswith("--videos="):
+            SaveVideos = a[len("--videos="):]
 
-ThreadURL = sys.argv[1]
-if ThreadURL.startswith("http://"):
-    ThreadURL = ThreadURL[7:]
-    
-if ThreadURL.startswith("https://"):
-    ThreadURL = ThreadURL[8:]
+        if a.startswith("--ignore-errors"):
+            IgnoreErrors = True
 
-ThreadURLParts = ThreadURL.split("/")
-SiteName = ThreadURLParts[0]
-BoardName = ThreadURLParts[1]
-ThreadNumber = ThreadURLParts[-1].split(".")[0]
-Protocol = "https://"
-NewThreadURL = Protocol+ThreadURL
+        if a.startswith("--cache="):
+            gCacheDir = a[len("--cache="):]
+            gCache.SetDirectory(gCacheDir)
+            gCache.EnableCache()
 
-print("Downloading", NewThreadURL)
-lRawData = execute_http_request(NewThreadURL, gRetryCount)
-print("Download complete, data size =", len(lRawData))
 
-lProcessedData = lRawData.decode("utf-8")
-print("Parsing page...")
+        if a.startswith("--format="):
+            SaveFormat = a[len("--format="):]
+            if SaveFormat == "tar":
+                pass
+            if SaveFormat == "txt":
+                SaveImages = "None"
+                SaveVideos = "None"
 
-Doc = THTMLDocument()
-htmlparser.Parse(lProcessedData, Doc, {}, [])
 
-bp = TIB2chParser()
-bp.Parse(Doc)
+    ThreadURL = address
+    if ThreadURL.startswith("http://"):
+        ThreadURL = ThreadURL[7:]
 
-print("Parsing complete")
+    if ThreadURL.startswith("https://"):
+        ThreadURL = ThreadURL[8:]
 
-ThreadText = "@global source=\""+NewThreadURL+"\" title=\""+gTitle+"\"\n"
-gImages = {}
+    if "#" in ThreadURL:
+        pos_index = ThreadURL.index("#")
+        ThreadURL = ThreadURL[:pos_index]
 
-for P in bp.fPosts:
-    ThreadText += P.Print()
+    ThreadURLParts = ThreadURL.split("/")
+    SiteName = ThreadURLParts[0]
+    BoardName = ThreadURLParts[1]
+    ThreadNumber = ThreadURLParts[-1].split(".")[0]
+    Protocol = "https://"
+    NewThreadURL = Protocol+ThreadURL
 
-if gCache.fEnabled:
-    gCache.ScanDirectory()
+    print("Downloading", NewThreadURL)
+    lRawData = execute_http_request(NewThreadURL, gRetryCount)
+    print("Download complete, data size =", len(lRawData))
 
-for P in bp.fPosts:
-    DownloadImages(P, gImages, gCache, SaveImages, SaveVideos, IgnoreErrors, gRetryCount)
-    
-tarfn = ""
-for c in NewThreadURL:
-    if c in statemachine.cENG_LETTERS + statemachine.cDIGITS:
-        tarfn += c
-    else:
-        tarfn += "_"
-        
+    lProcessedData = lRawData.decode("utf-8")
+    print("Parsing page...")
 
-savefn = SiteName+" - _"+BoardName+"_ - "+ThreadNumber
+    Doc = THTMLDocument()
+    htmlparser.Parse(lProcessedData, Doc, {}, [])
 
-if SaveFormat == "tar":
-    tarfn = savefn + ".tar"
-   
-    print("Saving data to", tarfn)
+    bp = TIB2chParser()
+    bp.Parse(Doc)
 
-    tar = tarfile.open(tarfn, "w")
-    for PN, PV in gImages.items():
-        fb = BytesIO(PV)
-        ti = tarfile.TarInfo(name=PN)
-        ti.size = len(PV)
+    print("Parsing complete")
+
+    ThreadText = "@global source=\""+NewThreadURL+"\" title=\""+gTitle+"\"\n"
+    gImages = {}
+
+    for P in bp.fPosts:
+        ThreadText += P.Print()
+
+    if gCache.fEnabled:
+        gCache.ScanDirectory()
+
+    for P in bp.fPosts:
+        DownloadImages(P, gImages, gCache, SaveImages, SaveVideos, Protocol, SiteName, IgnoreErrors, gRetryCount)
+
+    tarfn = ""
+    for c in NewThreadURL:
+        if c in statemachine.cENG_LETTERS + statemachine.cDIGITS:
+            tarfn += c
+        else:
+            tarfn += "_"
+
+
+    savefn = SiteName+" - _"+BoardName+"_ - "+ThreadNumber
+    if "Downloads" in config:
+        savefn = os.path.join(config["Downloads"], savefn)
+
+    if SaveFormat == "tar":
+        tarfn = savefn + ".tar"
+
+        print("Saving data to", tarfn)
+
+        #f = open(tarfn, "w", encoding="utf8")
+        #f.write("fghj")
+        #f.close()
+
+        tar = tarfile.open(tarfn, "w")
+        for PN, PV in gImages.items():
+            fb = BytesIO(PV)
+            ti = tarfile.TarInfo(name=PN)
+            ti.size = len(PV)
+            ti.mtime = time.time()
+            tar.addfile(tarinfo=ti, fileobj=fb)
+
+        ThreadTextData = ThreadText.encode("utf-8")
+        fb = BytesIO(ThreadTextData)
+        ti = tarfile.TarInfo(name="index.txt")
+        ti.size = len(ThreadTextData)
         ti.mtime = time.time()
         tar.addfile(tarinfo=ti, fileobj=fb)
-        
-    ThreadTextData = ThreadText.encode("utf-8")
-    fb = BytesIO(ThreadTextData)
-    ti = tarfile.TarInfo(name="index.txt")
-    ti.size = len(ThreadTextData)
-    ti.mtime = time.time()
-    tar.addfile(tarinfo=ti, fileobj=fb)
-    
-    fb = BytesIO(lRawData)
-    ti = tarfile.TarInfo(name="index.html")
-    ti.size = len(lRawData)
-    ti.mtime = time.time()
-    tar.addfile(tarinfo=ti, fileobj=fb)
 
-    tar.close()
-    print("Saving complete")
-    
-elif SaveFormat == "txt":
-    txtfn = savefn + ".txt"
-    print("Saving data to", txtfn)
-    ThreadTextData = ThreadText.encode("utf-8")
-    fxt = open(txtfn, "wb")
-    fxt.write(ThreadTextData)
-    fxt.close()
-    print("Saving complete")
+        fb = BytesIO(lRawData)
+        ti = tarfile.TarInfo(name="index.html")
+        ti.size = len(lRawData)
+        ti.mtime = time.time()
+        tar.addfile(tarinfo=ti, fileobj=fb)
+
+        tar.close()
+        print("Saving complete")
+
+    elif SaveFormat == "txt":
+        txtfn = savefn + ".txt"
+        print("Saving data to", txtfn)
+        ThreadTextData = ThreadText.encode("utf-8")
+        fxt = open(txtfn, "wb")
+        fxt.write(ThreadTextData)
+        fxt.close()
+        print("Saving complete")
 
