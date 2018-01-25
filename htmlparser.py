@@ -484,6 +484,14 @@ def Parse(Data, Document, Parameters, ErrorHandlers):
                 raise "Error state"
         else:
             print("lRes == ", lRes)
+            print("Position:", R.fPosition)
+            lMax = min(len(R.fData)-R.fPosition, 500)
+            S = R.fData[R.fPosition:lMax]
+            print("Data after current position:", S)
+            if "ContinueOnParsingError" in Parameters:
+                pass
+            else:
+                quit(-1)
 
     
     if Parameters.get("Debug"):
