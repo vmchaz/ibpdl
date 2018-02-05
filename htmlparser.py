@@ -187,6 +187,7 @@ def OnDoneReadingTagFinish(R, StateContainer, NodeContainer, Accumulators, AttrB
         N = THTMLNode(NodeContainer.fDocument)
         N.fDocument = NodeContainer.fDocument
         N.fNodeType = lTag
+        N.fAttributes = copy.deepcopy(AttrBuffer)
         N.fParentNode = NodeContainer.fNode
         N.fDepth = NodeContainer.fNode.fDepth + 1
         NodeContainer.fNode.AddChildNode(N)
@@ -497,6 +498,8 @@ def Parse(Data, Document, Parameters, ErrorHandlers):
     if Parameters.get("Debug"):
         for L in lDebugLines:
             print(L)
+
+    return lRes
     #print("Position (Current/Max):", R.fPosition, len(lProcessedData))
 
     #except:
